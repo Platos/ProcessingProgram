@@ -6,13 +6,14 @@ function ProcessingProgram()
     addpath data 
     addpath dataset 
     
-    global U I timeT Ip Up Isn Usn Ics Ic Ks;
+    global U I timeT Isn Usn Ics Ic Ks hA1;
     global UFreq IFreq IRes URes;
     global X SYSTEM FLUID NEEDLE SPEED POLARITY TEMPERATURE;
     global txtFilePathI txtFilePathU edtIFreq edtUFreq edtIRes;
     global edtURes btnSelect edtSNI edtSNU edtSNIc btnRefresh;
     global edtSYSTEM edtFLUID btnDATAsv edtTEMP edtPOLARITY edtNEEDLE;
-    global edtSPEED edtTEMPres;
+    global edtSPEED edtTEMPres edtPOG;
+    global cbCVC cbCTC cbCVCws;
     
     global commited;
 	commited = 0;
@@ -175,6 +176,33 @@ btnDATAsv = uicontrol(gcf,'Style','pushbutton','units','normal','Enable', 'off',
 uicontrol(gcf,'Style','pushbutton','units','normal',...   
           'Position',[(XLine3) (YLine3-0.15) 0.21 0.04],...
           'String','Swich to processing','Callback',@clbPROC);
+% Ks editor - coeff point on graf
+uicontrol(gcf,'style', 'text','units','normal',...
+          'position', [XLine1 (YLine1-0.46) .10 .035],'string', 'N POG','horizontalAlignment', 'left',...
+          'foregroundcolor', 'black','backgroundcolor', figcolor);
+edtPOG=uicontrol(gcf,'Style','edit','units','normal',... 
+          'Position',[(XLine1+0.05) (YLine1-0.46) 0.15 0.04],...
+          'String','1000');
+% plot this
+cbCVC=uicontrol(gcf,'style', 'checkbox','units','normal',...
+          'position', [XLine1 (YLine1-0.51) .035 .035],...
+          'foregroundcolor', 'black','backgroundcolor', figcolor);
+uicontrol(gcf,'style', 'text','units','normal',...
+          'position', [XLine1+0.035 (YLine1-0.51) .10 .035],'string', 'CVC','horizontalAlignment', 'left',...
+          'foregroundcolor', 'black','backgroundcolor', figcolor); 
+cbCVCws=uicontrol(gcf,'style', 'checkbox','units','normal',...
+          'position', [XLine1 (YLine1-0.56) .035 .035],...
+          'foregroundcolor', 'black','backgroundcolor', figcolor);
+uicontrol(gcf,'style', 'text','units','normal',...
+          'position', [XLine1+0.035 (YLine1-0.56) .10 .035],'string', 'CVCws','horizontalAlignment', 'left',...
+          'foregroundcolor', 'black','backgroundcolor', figcolor);
+cbCTC=uicontrol(gcf,'style', 'checkbox','units','normal',...
+          'position', [XLine1 (YLine1-0.61) .035 .035],...
+          'foregroundcolor', 'black','backgroundcolor', figcolor);
+uicontrol(gcf,'style', 'text','units','normal',...
+          'position', [XLine1+0.035 (YLine1-61) .15 .035],'string', 'CTCaVTC','horizontalAlignment', 'left',...
+          'foregroundcolor', 'black','backgroundcolor', figcolor);      
+      
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 end
@@ -198,7 +226,21 @@ function init()
 end
  
 function clbOpen(~,~,dialogTitle,~)
-	[FileName,PathName] = uigetfile('*I.dat', dialogTitle);
+    
+%~~ChecKing "addPathName.mat" existing & dir 'addPathName' existing~~   
+    if exist('bin/addPathName.mat','file')
+        load addPathName;
+        if exist(addPathName,'dir')
+            [FileName,PathName] = uigetfile('*I.dat', dialogTitle,...
+                                    addPathName);
+        else
+            [FileName,PathName] = uigetfile('*I.dat', dialogTitle);
+        end
+    else
+        [FileName,PathName] = uigetfile('*I.dat', dialogTitle);
+    end
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 	fprintf('FileName = %s PathName = %s\n', FileName, PathName)
     
 	addpath(PathName);
@@ -206,7 +248,7 @@ function clbOpen(~,~,dialogTitle,~)
 	[I, timeT, IFreq]=getSIGNAL(FileName);
 	maxI=max(I);
 	minI=min(I);
-	Ip = sign(maxI+minI)*I*1e9/IRes;        %nA
+	I = sign(maxI+minI)*I*1e9/IRes;        %nA
 
 	set(edtIFreq, 'String', num2str(IFreq));
 	set(edtSNI,'string',num2str(IFreq/50));
@@ -217,12 +259,14 @@ function clbOpen(~,~,dialogTitle,~)
 	[U, timeT, UFreq]=getSIGNAL(FileName);
 	maxU=max(U);
 	minU=min(U);
-	Up = sign(maxU+minU)*U/URes*1e6;       %kV
+	U = sign(maxU+minU)*U/URes*1e6;       %kV
             
 	set(edtUFreq, 'String', num2str(UFreq));
 	set(edtSNU,'string',num2str(UFreq/50));
 	set(txtFilePathU, 'string', [PathName FileName])
 	Uflag=1;
+    addPathName=PathName;
+    save('bin/addPathName.mat','addPathName')
 
 	if Iflag==1 && Uflag==1
         set(edtIRes, 'Enable', 'on');
@@ -246,7 +290,7 @@ function clbSelect(~,~)
         axes(hA1)
         cla(hA1)
             
-        [X, Ks]=pltSignal(UFreq,IFreq,Ip,Up);
+        [X, Ks]=pltSignal(UFreq,IFreq,I,U);
 
         set(edtSNU, 'Enable', 'on'); 
         set(edtSNI, 'Enable', 'on');
@@ -268,7 +312,7 @@ function clbRefresh(~,~)
 	NSmoothU = str2double(get(edtSNU, 'string'));
 	NSmoothI = str2double(get(edtSNI, 'string'));
 	NSmoothIc = str2double(get(edtSNIc, 'string'));
-	[Isn, Usn, Ic, Ics]=SYNCHandSMOTH(Ip,Up,NSmoothU,NSmoothI,NSmoothIc,X);
+	[Isn, Usn, Ic, Ics, X]=SYNCHandSMOTH(I,U,NSmoothU,NSmoothI,NSmoothIc,X);
             
 	axes(hA1)
 	cla(hA1)
@@ -277,8 +321,21 @@ function clbRefresh(~,~)
 
 % Signals and IC
             
-	strtI=fix(0.05*length(Isn));
-	stpI=fix(0.95*length(Isn));
+	strtI=X(1);
+	stpI=X(2);
+    % n POG
+    Lu=length(Usn);
+    Ks=round(Lu/str2double(get(edtPOG,'string')));
+    
+% ??????????? ??????? ???? ?????? ??????? "set"
+% Undefined function or variable "set"
+% Error in ProcessingProgram/clbRefresh (line 312)
+% set(101,'NumberTitle','off','Name','ProcessingProgram:CVC'); 
+% Error while evaluating uicontrol Callback
+
+%     if Ks>Lu
+%         set(edtPOG,'string')=num2str(Lu);
+%     end
     
 	plot(Ti(strtI:Ks:stpI),Isn(strtI:Ks:stpI)/max(Isn),'r')
 	hold on
@@ -289,17 +346,14 @@ function clbRefresh(~,~)
 	xlabel('time [s]');
 	hold off
     
-	Ls=[length(Usn) length(Isn) length(Ics)];
-    ENDd=fix(min(Ls)*0.95);
-	BEGINd=fix(0.05*ENDd);
+	%Ls=[length(Usn) length(Isn) length(Ics)];
+    
+	BEGINd=X(1);
+    ENDd=X(2);
 	VACsm=200;
-            
-	suppFIG=figure(101);
-	set(suppFIG,'NumberTitle','off','Name','ProcessingProgram:CVC');
-            
-    plot(Usn(BEGINd:Ks:ENDd),Isn(BEGINd:Ks:ENDd)-Ics(BEGINd:Ks:ENDd),'y','LineWidth',2)
-    grid on,hold on
-            
+
+
+    
 	Uout=fastsmooth(Usn(BEGINd:ENDd),VACsm);
 	Iout=fastsmooth(Isn(BEGINd:ENDd)-Ics(BEGINd:ENDd),VACsm);
 	[value, nWAY]=max(Uout);
@@ -310,24 +364,36 @@ function clbRefresh(~,~)
             break;
         end
 	end
+
 	set(edtSPEED,'string',num2str(value/(nWAY-tSTARTn)*UFreq));
 	SPEED=num2str(value/(nWAY-tSTARTn)*UFreq);
+    
+    if get(cbCVC,'value')
+        figure(101);
+        set(101,'NumberTitle','off','Name','ProcessingProgram:CVC');
 
-	plot(Uout(1:Ks:nWAY),Iout(1:Ks:nWAY),'r','LineWidth',2)
-    plot(Uout(nWAY:Ks:end),Iout(nWAY:Ks:end),'b','LineWidth',2),grid on
-	hold off
-	legend('Experimental data','Increase voltage','Decrease voltage','Location','NorthWest');
-	ylabel('I [nA]');
-	xlabel('U [kV]');
-            
-	suppFIG2=figure(102);
-	set(suppFIG2,'NumberTitle','off','Name','ProcessingProgram:CVC');
-            
-	plot(Usn(1:Ks:end),Isn(1:Ks:end),'k','LineWidth',2),grid on,hold on
-	plot(Uout(1:Ks:end),Iout(1:Ks:end),'r','LineWidth',2),hold off
-	legend('Without subtraction Ic','With subtraction Ic','Location','North');
-	ylabel('I [nA]');
-	xlabel('U [kV]');
+        plot(Usn(BEGINd:Ks:ENDd),Isn(BEGINd:Ks:ENDd)-Ics(BEGINd:Ks:ENDd),'y','LineWidth',2)
+        grid on,hold on
+
+        plot(Uout(1:Ks:nWAY),Iout(1:Ks:nWAY),'r','LineWidth',2)
+        plot(Uout(nWAY:Ks:end),Iout(nWAY:Ks:end),'b','LineWidth',2),grid on
+        hold off
+        legend('Experimental data','Increase voltage','Decrease voltage','Location','NorthWest');
+        ylabel('I [nA]');
+        xlabel('U [kV]');
+        
+    end
+    
+    if get(cbCVCws,'value')
+        figure(102);
+        set(102,'NumberTitle','off','Name','ProcessingProgram:CVC');
+
+        plot(Usn(1:Ks:end),Isn(1:Ks:end),'k','LineWidth',2),grid on,hold on
+        plot(Uout(1:Ks:end),Iout(1:Ks:end),'r','LineWidth',2),hold off
+        legend('Without subtraction Ic','With subtraction Ic','Location','North');
+        ylabel('I [nA]');
+        xlabel('U [kV]');
+    end
     
 	NEEDLE=get(edtNEEDLE,'string');
 	SYSTEM=get(edtSYSTEM,'string');
@@ -337,15 +403,19 @@ function clbRefresh(~,~)
 	fprintf('Temporary information saved \n');
 	set(btnDATAsv, 'Enable', 'on');
     
-	figure(102)
-	plot(Ti(strtI:Ks:stpI),Isn(strtI:Ks:stpI)/max(Isn),'r')
-	hold on
-	plot(Tu(strtI:Ks:stpI),Usn(strtI:Ks:stpI)/max(Usn),'k')
-	plot(Ti(strtI:Ks:stpI),Ics(strtI:Ks:stpI)/max(Isn),'g')
-	grid on
-	legend('Current','Voltage','Capacitive current','Location','NorthEast');
-	xlabel('time [s]');
-	hold off
+    if get(cbCTC,'value')
+        figure(103);
+        set(103,'NumberTitle','off','Name','ProcessingProgram:CTC&VTC');
+        plot(Ti(strtI:Ks:stpI),Isn(strtI:Ks:stpI)/max(Isn),'r')
+        hold on
+        plot(Tu(strtI:Ks:stpI),Usn(strtI:Ks:stpI)/max(Usn),'k')
+        plot(Ti(strtI:Ks:stpI),Ics(strtI:Ks:stpI)/max(Isn),'g')
+        grid on
+        legend('Current','Voltage','Capacitive current','Location','NorthEast');
+        xlabel('time [s]');
+        hold off
+    end
+    
 end
 
 function clbDATAsv(~,~)

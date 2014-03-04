@@ -26,7 +26,7 @@ tic
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 %~~~~~Select current sinch leap~~~~~
-L=length(Is(min(xs):max(xs)));
+L=max(xs)-min(xs);
 tKs=round(L/1000);
 plot(Is(min(xs):tKs:max(xs))/ max(Is(min(xs):tKs:max(xs))), 'b');
 [x2, ~] = ginput(2);
